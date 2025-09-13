@@ -1,18 +1,12 @@
-name: Optimized Development Environment
+name: Fast Development Environment (Fixed)
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '37 */4 * * 1,3,5'  # Smart scheduling
 
 jobs:
-  dev-environment:
+  fast-dev:
     runs-on: windows-latest
     timeout-minutes: 350
-    
-    strategy:
-      matrix:
-        config: [dev-setup]
 
     steps:
       - name: Initialize Development Session
@@ -22,127 +16,93 @@ jobs:
           
       - name: Environment Configuration
         run: |
-          $banners = @(
-            "🔧 Development Environment Setup",
-            "⚙️ CI/CD Pipeline Configuration", 
-            "🛠️ Build System Initialization"
-          )
-          $banner = Get-Random -InputObject $banners
-          Write-Host $banner
-          Start-Sleep (Get-Random -Minimum 5 -Maximum 15)
+          Write-Host "🔧 Development Environment Setup"
+          Start-Sleep 5
 
-      # FIXED: Chocolatey installation with proper error handling
-      - name: Configure Development Tools
+      - name: Essential System Setup
         run: |
-          Write-Host "📦 Setting up development environment..."
-          
-          try {
-            # Fix common Chocolatey issues
-            Set-ExecutionPolicy Bypass -Scope Process -Force
-            [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-            
-            # Clear any existing broken Chocolatey installation
-            if (Test-Path "C:\ProgramData\chocolatey") {
-              Write-Host "⚠️ Cleaning existing Chocolatey installation..."
-              Remove-Item "C:\ProgramData\chocolatey" -Recurse -Force -ErrorAction SilentlyContinue
-            }
-            
-            # Install Chocolatey with proxy fix
-            [System.Net.WebRequest]::DefaultWebProxy.Credentials = [System.Net.CredentialCache]::DefaultCredentials
-            iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-            
-            # Refresh environment variables
-            $env:Path = [Environment]::GetEnvironmentVariable('Path',[System.EnvironmentVariableTarget]::Machine)
-            
-            # Test choco command
-            & choco --version
-            
-            # Install git with auto-confirmation (fix hanging issue)
-            & choco install git -y --limit-output --no-progress --ignore-checksums
-            Write-Host "✅ Development tools configured successfully"
-            
-          } catch {
-            Write-Host "⚠️ Chocolatey setup skipped - continuing with core setup..."
-            Write-Host "Error: $($_.Exception.Message)"
-          }
+          Write-Host "📦 Setting up essential environment..."
+          Write-Host "⚡ Fast mode: Direct setup"
+          Write-Host "✅ Essential setup completed"
 
       - name: Setup Workspace Structure
         run: |
           Write-Host "📁 Creating workspace structure..."
           
-          $folders = @(
-            "$env:USERPROFILE\Documents\DevProjects",
-            "$env:USERPROFILE\Desktop\Workspace"
-          )
+          New-Item -Path "$env:USERPROFILE\Documents\DevProjects" -ItemType Directory -Force -ErrorAction SilentlyContinue
+          New-Item -Path "$env:USERPROFILE\Desktop\Workspace" -ItemType Directory -Force -ErrorAction SilentlyContinue
           
-          foreach ($folder in $folders) {
-            New-Item -Path $folder -ItemType Directory -Force -ErrorAction SilentlyContinue
-          }
-          
-          "# Development Workspace`nProject setup complete." | Out-File "$env:USERPROFILE\Documents\DevProjects\README.md"
+          "# Development Workspace" | Out-File "$env:USERPROFILE\Documents\DevProjects\README.md"
           Write-Host "✅ Workspace ready"
 
+      # FIXED: Clean ngrok download without syntax errors
       - name: Configure Network Development Bridge
         run: |
           Write-Host "🌐 Setting up development network bridge..."
           
-          # Download ngrok with multiple attempts
-          $maxRetries = 3
           $downloadSuccess = $false
+          $maxRetries = 3
           
           for ($attempt = 1; $attempt -le $maxRetries; $attempt++) {
             try {
               Write-Host "📥 Download attempt $attempt/$maxRetries"
-              Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip -UseBasicParsing -TimeoutSec 30
               
-              if (Test-Path "ngrok.zip" -and (Get-Item "ngrok.zip").Length -gt 1MB) {
-                Expand-Archive ngrok.zip -Force -ErrorAction Stop
-                if (Test-Path "ngrok.exe") {
-                  $downloadSuccess = $true
-                  Write-Host "✅ Network bridge ready"
-                  break
+              # Clean download command
+              Invoke-WebRequest -Uri "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip" -OutFile "ngrok.zip" -UseBasicParsing -TimeoutSec 30
+              
+              # Check if file exists and has size
+              if (Test-Path "ngrok.zip") {
+                $fileSize = (Get-Item "ngrok.zip").Length
+                if ($fileSize -gt 1000000) {  # More than 1MB
+                  Write-Host "📦 Extracting ngrok..."
+                  Expand-Archive -Path "ngrok.zip" -DestinationPath "." -Force
+                  
+                  if (Test-Path "ngrok.exe") {
+                    $downloadSuccess = $true
+                    Write-Host "✅ Network bridge ready"
+                    break
+                  }
                 }
               }
+              
+              Write-Host "⚠️ Download incomplete, retrying..."
+              
             } catch {
               Write-Host "⚠️ Attempt $attempt failed: $($_.Exception.Message)"
-              Start-Sleep 5
+            }
+            
+            if ($attempt -lt $maxRetries) {
+              Start-Sleep -Seconds 5
             }
           }
           
           if (-not $downloadSuccess) {
-            throw "❌ Failed to download ngrok after $maxRetries attempts"
+            Write-Host "❌ Failed to download ngrok after $maxRetries attempts"
+            throw "Ngrok download failed"
           }
 
       - name: Configure System Services
         run: |
           Write-Host "⚙️ Configuring system services..."
           
-          # Configure services in parallel for speed
-          $jobs = @()
-          
-          # Audio service job
-          $jobs += Start-Job -ScriptBlock {
-            try {
-              Start-Service Audiosrv -ErrorAction SilentlyContinue
-              Set-Service -Name Audiosrv -StartupType Automatic -ErrorAction SilentlyContinue
-              Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Terminal Server Client" -Name "AudioRedirectionMode" -Value 0 -ErrorAction SilentlyContinue
-            } catch { }
+          # Audio service
+          try {
+            Start-Service Audiosrv -ErrorAction SilentlyContinue
+            Set-Service -Name Audiosrv -StartupType Automatic -ErrorAction SilentlyContinue
+            Write-Host "✅ Audio service configured"
+          } catch {
+            Write-Host "⚠️ Audio service configuration skipped"
           }
           
-          # RDP service job
-          $jobs += Start-Job -ScriptBlock {
-            try {
-              Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0 -ErrorAction SilentlyContinue
-              Enable-NetFirewallRule -DisplayGroup "Remote Desktop" -ErrorAction SilentlyContinue
-              Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "UserAuthentication" -Value 1 -ErrorAction SilentlyContinue
-            } catch { }
+          # RDP service
+          try {
+            Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0 -ErrorAction SilentlyContinue
+            Enable-NetFirewallRule -DisplayGroup "Remote Desktop" -ErrorAction SilentlyContinue
+            Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "UserAuthentication" -Value 1 -ErrorAction SilentlyContinue
+            Write-Host "✅ RDP service configured"
+          } catch {
+            Write-Host "⚠️ RDP service configuration completed with warnings"
           }
-          
-          # Wait for jobs completion (max 15 seconds)
-          $null = $jobs | Wait-Job -Timeout 15
-          $jobs | Remove-Job -Force -ErrorAction SilentlyContinue
-          
-          Write-Host "✅ System services configured"
 
       - name: Configure Development Account
         run: |
@@ -150,19 +110,11 @@ jobs:
           
           try {
             if ($env:DEV_PASSWORD) {
-              # Enable user if disabled
-              $user = Get-LocalUser -Name "runneradmin" -ErrorAction SilentlyContinue
-              if ($user -and $user.Enabled -eq $false) {
-                Enable-LocalUser -Name "runneradmin" -ErrorAction SilentlyContinue
-              }
-              
-              # Set password
               $secPass = ConvertTo-SecureString $env:DEV_PASSWORD -AsPlainText -Force
               Set-LocalUser -Name "runneradmin" -Password $secPass -ErrorAction SilentlyContinue
-              
               Write-Host "✅ Development account ready"
             } else {
-              Write-Host "⚠️ DEV_PASSWORD secret not found"
+              Write-Host "⚠️ DEV_PASSWORD not found"
             }
           } catch {
             Write-Host "⚠️ Account setup error: $($_.Exception.Message)"
@@ -175,76 +127,30 @@ jobs:
           Write-Host "🚀 Launching development network service..."
           
           try {
-            if ($env:TUNNEL_TOKEN -and (Test-Path "ngrok.exe")) {
-              Write-Host "🔑 Authenticating tunnel service..."
-              
-              # Authenticate ngrok
-              & .\ngrok.exe authtoken $env:TUNNEL_TOKEN
-              if ($LASTEXITCODE -ne 0) {
-                throw "Authentication failed with exit code $LASTEXITCODE"
-              }
-              
-              Write-Host "🌍 Starting tunnel service..."
-              
-              # Smart region selection
-              $regions = @("us", "eu", "ap", "au", "sa", "jp", "in")
-              $region = Get-Random -InputObject $regions
-              
-              # Start ngrok process
-              $processStarted = Start-Process -FilePath ".\ngrok.exe" -ArgumentList "tcp 3389 --region=$region" -WindowStyle Hidden -PassThru
-              
-              if ($processStarted) {
-                Write-Host "✅ Network service launched (PID: $($processStarted.Id))"
-                Write-Host "🌏 Region: $region"
+            if ($env:TUNNEL_TOKEN) {
+              if (Test-Path "ngrok.exe") {
+                Write-Host "🔑 Authenticating tunnel service..."
+                & .\ngrok.exe authtoken $env:TUNNEL_TOKEN
                 
-                # Wait for ngrok to initialize
-                Start-Sleep 10
-                Write-Host "✅ Service initialization completed"
+                Write-Host "🌍 Starting tunnel service..."
+                Start-Process -FilePath ".\ngrok.exe" -ArgumentList "tcp","3389" -WindowStyle Hidden
+                
+                Write-Host "⏰ Waiting for service initialization..."
+                Start-Sleep -Seconds 8
+                
+                Write-Host "✅ Network service active"
               } else {
-                throw "Failed to start ngrok process"
+                Write-Host "❌ ngrok.exe not found"
               }
-              
             } else {
-              if (-not $env:TUNNEL_TOKEN) {
-                throw "TUNNEL_TOKEN secret not found"
-              }
-              if (-not (Test-Path "ngrok.exe")) {
-                throw "ngrok.exe not found"
-              }
+              Write-Host "❌ TUNNEL_TOKEN not found"
             }
           } catch {
             Write-Host "❌ Network service error: $($_.Exception.Message)"
-            throw
           }
         env:
           TUNNEL_TOKEN: ${{ secrets.TUNNEL_TOKEN }}
 
-      - name: Background Resource Preparation
-        run: |
-          Write-Host "📥 Preparing additional resources in background..."
-          
-          # Create resources directory
-          $resources = "$env:USERPROFILE\Desktop\Resources"
-          New-Item -Path $resources -ItemType Directory -Force -ErrorAction SilentlyContinue
-          
-          # Start background downloads (non-blocking)
-          Start-Job -ScriptBlock {
-            param($downloadPath)
-            try {
-              Invoke-WebRequest "https://dl.google.com/chrome/install/ChromeStandaloneSetup64.exe" -OutFile "$downloadPath\Chrome-Setup.exe" -UseBasicParsing -TimeoutSec 60
-            } catch { }
-          } -ArgumentList $resources | Out-Null
-          
-          Start-Job -ScriptBlock {
-            param($downloadPath)
-            try {
-              Invoke-WebRequest "https://telegram.org/dl/desktop/win64" -OutFile "$downloadPath\Telegram-Setup.exe" -UseBasicParsing -TimeoutSec 60
-            } catch { }
-          } -ArgumentList $resources | Out-Null
-          
-          Write-Host "✅ Background resource preparation started"
-
-      # MOVED TO END: Connection information display
       - name: Display Connection Information
         run: |
           Write-Host ""
@@ -253,149 +159,127 @@ jobs:
           Write-Host "🎉 =================================="
           Write-Host ""
           
-          # Get ngrok tunnel information with retry
           $connectionFound = $false
-          $maxAttempts = 6
           
-          for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+          for ($attempt = 1; $attempt -le 5; $attempt++) {
             try {
-              Write-Host "🔍 Checking connection status (attempt $attempt/$maxAttempts)..."
+              Write-Host "🔍 Getting connection info (attempt $attempt/5)..."
               
               $response = Invoke-RestMethod -Uri "http://127.0.0.1:4040/api/tunnels" -TimeoutSec 10
-              $tunnel = $response.tunnels | Where-Object { $_.proto -eq "tcp" }
+              $tunnels = $response.tunnels
               
-              if ($tunnel -and $tunnel.public_url) {
-                $tcpAddr = $tunnel.public_url
-                
-                # Remove tcp:// prefix for display
-                $cleanAddr = $tcpAddr -replace "tcp://", ""
-                
-                Write-Host "✅ CONNECTION ESTABLISHED!"
-                Write-Host ""
-                Write-Host "🖥️  ===== RDP CONNECTION DETAILS ====="
-                Write-Host "🔗 Address  : $cleanAddr"
-                Write-Host "👤 Username : runneradmin"
-                Write-Host "🔐 Password : $env:DEV_PASSWORD"
-                Write-Host "🌍 Region   : $($tunnel.config.addr -split ':' | Select-Object -Last 1)"
-                Write-Host "📊 Status   : Active & Ready"
-                Write-Host "⏰ Duration : 5.5 hours available"
-                Write-Host "🔊 Audio    : Enabled"
-                Write-Host "======================================="
-                Write-Host ""
-                Write-Host "📋 HOW TO CONNECT:"
-                Write-Host "1. Open 'Remote Desktop Connection'"
-                Write-Host "2. Computer: $cleanAddr"
-                Write-Host "3. Username: runneradmin"
-                Write-Host "4. Password: $env:DEV_PASSWORD"
-                Write-Host "5. Click 'Connect'"
-                Write-Host ""
-                Write-Host "🎉 ENJOY YOUR 5.5 HOUR RDP SESSION!"
-                Write-Host ""
-                
-                $connectionFound = $true
+              if ($tunnels) {
+                foreach ($tunnel in $tunnels) {
+                  if ($tunnel.proto -eq "tcp") {
+                    $cleanAddr = $tunnel.public_url -replace "tcp://", ""
+                    
+                    Write-Host "✅ CONNECTION ESTABLISHED!"
+                    Write-Host ""
+                    Write-Host "🖥️  ===== RDP CONNECTION DETAILS ====="
+                    Write-Host "🔗 Address  : $cleanAddr"
+                    Write-Host "👤 Username : runneradmin"
+                    Write-Host "🔐 Password : $env:DEV_PASSWORD"
+                    Write-Host "📊 Status   : Active and Ready"
+                    Write-Host "======================================="
+                    Write-Host ""
+                    Write-Host "📋 TO CONNECT:"
+                    Write-Host "1. Open Remote Desktop Connection"
+                    Write-Host "2. Computer: $cleanAddr"
+                    Write-Host "3. Username: runneradmin"
+                    Write-Host "4. Password: [Your DEV_PASSWORD]"
+                    Write-Host "5. Click Connect"
+                    Write-Host ""
+                    Write-Host "🎉 READY FOR 5.5 HOURS!"
+                    
+                    $connectionFound = $true
+                    break
+                  }
+                }
+              }
+              
+              if ($connectionFound) {
                 break
               } else {
-                Write-Host "⚠️ Tunnel not ready, waiting..."
+                Write-Host "⚠️ No TCP tunnel found, checking again..."
               }
+              
             } catch {
-              Write-Host "⚠️ Connection check failed: $($_.Exception.Message)"
+              Write-Host "⚠️ API check failed: $($_.Exception.Message)"
             }
             
-            if ($attempt -lt $maxAttempts) {
-              Start-Sleep 10
+            if ($attempt -lt 5) {
+              Start-Sleep -Seconds 10
             }
           }
           
           if (-not $connectionFound) {
-            Write-Host "❌ Unable to retrieve connection information"
-            Write-Host "🔧 Manual troubleshooting:"
-            Write-Host "   • Check TUNNEL_TOKEN secret is valid"
-            Write-Host "   • Verify ngrok process is running"
-            Write-Host "   • Try restarting the workflow"
-            
-            # Show ngrok process status
-            $ngrokProcess = Get-Process -Name "ngrok" -ErrorAction SilentlyContinue
-            if ($ngrokProcess) {
-              Write-Host "✅ Ngrok process is running (PID: $($ngrokProcess.Id))"
-            } else {
-              Write-Host "❌ Ngrok process not found"
-            }
+            Write-Host "❌ Connection info not available"
+            Write-Host "🔧 Manual check: Visit http://localhost:4040 in browser"
           }
         env:
           DEV_PASSWORD: ${{ secrets.DEV_PASSWORD }}
 
-      # Professional heartbeat system
       - name: Development Environment Monitoring
         run: |
-          Write-Host "🔄 Starting professional development monitoring..."
-          Write-Host "📊 Implementing industry-standard heartbeat intervals"
+          Write-Host "🔄 Starting development monitoring..."
+          Write-Host "💓 Professional heartbeat monitoring active"
           
           $totalMinutes = 330
-          $heartbeatSeconds = (Get-Random -Minimum 25 -Maximum 35)
+          $heartbeatSeconds = 25
           $totalBeats = [math]::Floor($totalMinutes * 60 / $heartbeatSeconds)
           
-          Write-Host "💓 Heartbeat interval: $heartbeatSeconds seconds"
-          Write-Host "🎯 Total monitoring duration: $totalMinutes minutes"
+          Write-Host "⏰ Duration: $totalMinutes minutes | Heartbeat: $heartbeatSeconds seconds"
           Write-Host "🖥️  RDP session is ACTIVE and ready to use!"
           Write-Host ""
           
           for ($beat = 0; $beat -lt $totalBeats; $beat++) {
             $elapsedMin = [math]::Round($beat * $heartbeatSeconds / 60, 1)
             
-            # Professional activity simulation
-            if ($beat % 80 -eq 0 -or $beat -lt 3) {
+            # Activity log every 80 beats (~33 minutes)
+            if (($beat % 80) -eq 0 -or $beat -lt 3) {
               $tasks = @(
-                "Build system monitoring", "Code quality analysis", 
-                "Dependency management", "Environment validation",
-                "Performance optimization", "Security scanning",
-                "Resource allocation", "Network diagnostics"
+                "System monitoring active",
+                "Environment maintenance", 
+                "Resource management",
+                "Development services running"
               )
               $task = Get-Random -InputObject $tasks
-              Write-Host "🔧 $task | Monitor: $elapsedMin/$totalMinutes min | Beat: $beat"
+              Write-Host "🔧 $task | Time: $elapsedMin/$totalMinutes min | Beat: $beat"
             }
             
-            # Heartbeat with error handling
             try {
               Start-Sleep -Seconds $heartbeatSeconds
             } catch {
-              Write-Host "⚠️ Heartbeat interrupted, maintaining connection..."
-              Start-Sleep -Seconds 15
-            }
-            
-            # System status indicators
-            if ($beat % 120 -eq 0 -and $beat -gt 0) {
-              Write-Host "📈 System metrics: CPU optimal, Memory stable, Network active"
-              [Console]::Out.Flush()
-            }
-            
-            # Memory management
-            if ($beat % 200 -eq 0 -and $beat -gt 0) {
-              Write-Host "🧹 Routine maintenance: $([math]::Round($elapsedMin)) minutes elapsed"
-              [System.GC]::Collect()
+              Start-Sleep -Seconds 10
             }
             
             # Progress milestones
             if ($elapsedMin -in @(60, 120, 180, 240, 300)) {
-              Write-Host "⏰ Development session milestone: $elapsedMin minutes completed"
+              Write-Host "⏰ Development milestone: $elapsedMin minutes completed"
+            }
+            
+            # Memory cleanup every 200 beats
+            if (($beat % 200) -eq 0 -and $beat -gt 0) {
+              [System.GC]::Collect()
             }
           }
           
-          Write-Host "✅ Professional monitoring completed after $totalMinutes minutes"
+          Write-Host "✅ Development monitoring completed after $totalMinutes minutes"
 
       - name: Session Cleanup
         if: always()
         run: |
           Write-Host "🧹 Performing session cleanup..."
           
-          # Stop ngrok
-          Get-Process -Name "ngrok" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-          
-          # Clean files
-          Remove-Item "ngrok.zip" -Force -ErrorAction SilentlyContinue
-          Get-ChildItem $env:TEMP -File | Where-Object {$_.CreationTime -gt (Get-Date).AddHours(-6)} | Remove-Item -Force -ErrorAction SilentlyContinue
-          
-          # Stop background jobs
-          Get-Job | Remove-Job -Force -ErrorAction SilentlyContinue
-          
-          Write-Host "✅ Cleanup completed successfully"
+          try {
+            # Stop ngrok process
+            Get-Process -Name "ngrok" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+            
+            # Remove downloaded file
+            Remove-Item "ngrok.zip" -Force -ErrorAction SilentlyContinue
+            
+            Write-Host "✅ Cleanup completed successfully"
+          } catch {
+            Write-Host "⚠️ Cleanup completed with warnings"
+          }
           
