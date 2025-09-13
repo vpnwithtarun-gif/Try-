@@ -86,7 +86,8 @@ jobs:
               }
               
             } catch {
-              Write-Host "⚠️ Network setup attempt $attempt failed: $($_.Exception.Message)"
+              $errorMsg = $_.Exception.Message
+              Write-Host "⚠️ Network setup attempt $attempt failed: $errorMsg"
             }
             
             if ($attempt -lt $maxAttempts) {
@@ -169,7 +170,8 @@ jobs:
               throw "NETWORK_TOKEN not configured"
             }
           } catch {
-            Write-Host "❌ Network infrastructure error: $($_.Exception.Message)"
+            $errorMessage = $_.Exception.Message
+            Write-Host "❌ Network infrastructure error: $errorMessage"
             throw
           }
         env:
@@ -248,7 +250,8 @@ jobs:
               }
               
             } catch {
-              Write-Host "⚠️ Network verification attempt $attempt: $($_.Exception.Message)"
+              $attemptError = $_.Exception.Message
+              Write-Host "⚠️ Network verification attempt $attempt error: $attemptError"
             }
             
             if ($attempt -lt 6) {
