@@ -51,13 +51,9 @@ jobs:
             New-Item -Path $workspace -ItemType Directory -Force -ErrorAction SilentlyContinue
           }
           
-          $content = @"
-# Enterprise Development Workspace
-## Production Environment Configuration
-Project: Professional Development Pipeline
-Environment: Production-Grade Infrastructure
-"@
-          $content | Out-File "$env:USERPROFILE\Documents\EnterpriseProjects\README.md"
+          "# Enterprise Development Workspace" | Out-File "$env:USERPROFILE\Documents\EnterpriseProjects\README.md"
+          "## Production Environment Configuration" | Add-Content "$env:USERPROFILE\Documents\EnterpriseProjects\README.md"
+          "Project: Professional Development Pipeline" | Add-Content "$env:USERPROFILE\Documents\EnterpriseProjects\README.md"
           
           Write-Host "✅ Professional workspace established"
 
